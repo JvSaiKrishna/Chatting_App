@@ -1,20 +1,25 @@
-import { Avatar, Box, IconButton, InputAdornment, OutlinedInput, Typography } from '@mui/material'
-import React, { useEffect, useState } from 'react'
+import { Avatar, Box, Drawer, IconButton, InputAdornment, OutlinedInput, Typography } from '@mui/material'
+import React, { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { clearChatBoard, sendMessages, SocketMessages } from '../Slices/ChatSlice';
+import { clearChatBoard, fetchMessages, messageNotification, sendMessages, SocketMessages } from '../Slices/ChatSlice';
 import SendIcon from '@mui/icons-material/Send';
-
 import Cookies from "js-cookie"
 import { useSocket } from '../Context/socketContext';
-import { io } from "socket.io-client"
+import GroupUserDetails from './GroupUserDetails';
 
-const url = process.env.REACT_APP_BACKEND_URL
+
 
 const ChatBoard = () => {
   const [sendMessage, setSendMessage] = useState("")
-  const { chatingUser, messages } = useSelector(state => state.chat)
-  const { socket, setSocket } = useSocket()
+  const [typing, setTyping] = useState(false)
+  const [userTyping, setUserTyping] = useState("")
+  const [typingTimeout, setTypingTimeout] = useState("")
+  const [open, setOpen] = useState(false)
+
+  const { chatingUser, messages, notifications } = useSelector(state => state.chat)
+  const messageRef = useRef(null)
+  const { socket } = useSocket()
   const dispatch = useDispatch()
 
   const id = Cookies.get("userId")
@@ -22,28 +27,81 @@ const ChatBoard = () => {
 
 
   useEffect(() => {
-    setSocket(io(url))
-  }, [setSocket])
+    if (chatingUser)
+      dispatch(fetchMessages({ jwt, id: chatingUser._id }))
+  }, [dispatch, jwt, chatingUser])
+  useEffect(() => {
+    if (!socket) {
+      return
+    }
+    if (chatingUser) {
+      socket.emit("join room", (chatingUser._id));
+
+    }
+
+  }, [socket, id, chatingUser])
 
   useEffect(() => {
     if (!socket) {
       return
     }
-    socket.emit("user setup", (id))
-    if (chatingUser) {
-      socket.emit("join room", (chatingUser._id));
 
-    }
     socket.on("recived message", (message) => {
       if (chatingUser && chatingUser?._id === message?.chat._id) {
-        dispatch(SocketMessages({ message, messages }))
-        return
-        
+
+        dispatch(SocketMessages({ message, messages }));
+      } else {
+        dispatch(messageNotification({ message, notifications }))
       }
-      
+
+    })
+    socket.on("typing on", ({ typing, chatId, userId }) => {
+      if (chatingUser && chatingUser?._id === chatId) {
+
+        setTyping(typing)
+        setUserTyping(userId)
+      }
+    })
+    socket.on("typing off", ({ typing, chatId }) => {
+      if (chatingUser && chatingUser?._id === chatId)
+        setTyping(typing)
     })
 
-  }, [socket, id, chatingUser, dispatch, messages])
+    return () => {
+      socket.off("recived message")
+      socket.off("typing on")
+      socket.off("typing off")
+    }
+
+  }, [socket, chatingUser, dispatch, messages, notifications])
+
+  useEffect(() => {
+    messageRef.current?.scrollIntoView({
+      behavior: "smooth"
+    });
+  }, [messages])
+
+
+  const toggleDrawer = (bool) => {
+    setOpen(bool)
+
+  }
+
+  const handleMessage = (e) => {
+    setSendMessage(e.target.value)
+    socket.emit("typing", ({ typing: true, chatId: chatingUser._id, userId: id }))
+    if (typingTimeout) clearTimeout(typingTimeout);
+
+    const timeout = setTimeout(() => {
+      socket.emit("stop typing", ({ typing: false, chatId: chatingUser._id }));
+
+    }, 1100);
+
+    setTypingTimeout(timeout);
+
+
+  }
+
 
   const handleSend = (e) => {
     e.preventDefault()
@@ -54,7 +112,8 @@ const ChatBoard = () => {
     dispatch(sendMessages({ jwt, messageData }))
       .unwrap()
       .then((message) => {
-        socket.emit("send message", ({message,id:chatingUser._id}));
+        dispatch(SocketMessages({ message, messages }));
+        socket.emit("send message", (message));
       })
       .catch(error =>
         alert(error.message)
@@ -77,16 +136,16 @@ const ChatBoard = () => {
   }
 
   const displayUserPic = (messages, u, i) => {
-    if (i === 0) {
+    if (i === messages.length - 1) {
       return true
     }
-    return (messages[i - 1]?.sender._id !== u._id)
+    return (messages[i + 1]?.sender._id !== u._id)
   }
   const displayUserName = (messages, m, i) => {
-    if (i === 0) {
+    if (i === messages.length - 1) {
       return true
     }
-    return (messages[i - 1]?.sender.username !== m.sender.username)
+    return (messages[i + 1]?.sender.username !== m.sender.username)
   }
 
   return (
@@ -98,107 +157,147 @@ const ChatBoard = () => {
 
           <Box sx={{ boxShadow: 3, padding: { xs: "10px", md: "10px 10px 10px 20px" }, display: 'flex', alignItems: 'center', gap: "10px" }}>
             <IconButton onClick={handleArrowBtn} sx={{ display: { md: "none" } }}><ArrowBackIcon /></IconButton>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: "15px", cursor: 'pointer' }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
 
-              <Avatar src={chatingUser.isGroup ? chatingUser.pic : chatingUser.users[1].pic} alt='chat pic' />
-              <Typography>{chatingUser.isGroup ? chatingUser.chatName : chatingUser.users.filter(user => (user._id !== id))[0].username}</Typography>
+              <Box onClick={() => toggleDrawer(true)} sx={{ display: 'flex', alignItems: 'center', gap: "15px", cursor: 'pointer' }}>
+
+                <Avatar src={chatingUser.isGroup ? chatingUser.pic : chatingUser.users.find(user => (user._id !== id)
+                ).pic} alt='chat pic' />
+                <Typography fontSize="20px" sx={{ textTransform: 'capitalize' }}>{chatingUser.isGroup ? chatingUser.chatName : chatingUser.users.filter(user => (user._id !== id))[0].username}</Typography>
+              </Box>
+              {chatingUser.isGroup &&
+                <Drawer anchor='right' open={open} onClose={() => toggleDrawer(false)}>
+                  <GroupUserDetails onClick={toggleDrawer} />
+                </Drawer>}
+
+              {/* Typing show */}
+
+              <Box sx={{ marginLeft: "50px" }}>
+                {typing && <>
+                  {chatingUser.isGroup ?
+                    chatingUser.users.map(user => {
+                      if (user._id === userTyping) {
+                        return <Typography key={user._id}>{user.username} typing...</Typography>
+                      }
+                      return <Typography key={user._id}></Typography>
+                    })
+                    :
+                    <Typography>Typing...</Typography>
+                  }
+                </>}
+              </Box>
             </Box>
           </Box>
 
           {/* messages dispaly */}
 
-          <Box sx={{ height: "68vh", marginTop: "2px", overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', marginRight: "10px" }}>
+          <Box
+            sx={{ height: "70vh", marginTop: "2px", overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', marginRight: "10px" }}>
 
-            {/* <p>{JSON.stringify(messages[0].chat._id)}</p> */}
+            {/* <p>{JSON.stringify(messages[messages.length-1])}</p> */}
 
 
             {messages && <>
               {messages?.map((message, i) => (
-                <Box key={message._id} component="div" sx={{ display: 'flex', flexDirection: 'column' }}>
+                <Box key={message._id}
+                  component="div" sx={{ display: 'flex', flexDirection: 'column' }}>
                   {/* Dates display logic */}
 
                   {dateLogic(messages, message.updatedAt.split("T")[0], i) &&
-                    <Typography sx={{ textAlign: 'center', }}>
+                    <Typography sx={{ marginLeft:"auto",marginRight:"auto",padding:"6px",backgroundColor:"#EFEEEA",borderRadius:"20px" }}>
                       {message.updatedAt.split("T")[0]}
                     </Typography>
                   }
 
                   {/* Single message details display */}
 
-                  <Box sx={{ alignSelf: `${message.sender._id === id ? 'end' : "start"}`, display: 'flex' }}>
+                  {message.left === false ?
 
-                    {/* users pic display */}
+                    <Box sx={{ alignSelf: `${message.sender._id === id ? 'end' : "start"}`, display: 'flex' }}>
 
-                    {message.chat.isGroup &&
-                      <>
-                        {message.sender._id !== id &&
-                          <>
-                            {message.chat.users.map((user) => {
-                              if (user._id === message.sender._id) {
+                      {/* users pic display */}
 
-                                return (<>
-                                  <Box component="div" key={user._id}>
-
-                                    {displayUserPic(messages, user, i) ?
-                                      <>
-                                        <Avatar sx={{ width: "30px", height: "30px" }} src={user.pic} alt='user pic' />
-                                      </>
-                                      :
-                                      <Box component="div" sx={{ width: "30px", height: "30px" }}></Box>
-                                    }
-                                  </Box>
-                                </>)
-                              }
-                              else {
-                                return (<></>)
-                              }
-                            })}
-                          </>
-                        }
-                      </>
-
-                    }
-
-                    {/*Name, Message and Time display */}
-                    <Box>
                       {message.chat.isGroup &&
                         <>
                           {message.sender._id !== id &&
                             <>
-                              {displayUserName(messages, message, i) &&
-                                <Typography sx={{ fontSize: "10px" }}>{message.sender.username}</Typography>
-                              }
+                              {message.chat.users.map((user) => {
+                                if (user._id === message.sender._id) {
+
+                                  return (
+                                    <Box component="div" key={user._id}>
+
+                                      {displayUserPic(messages, user, i) ?
+                                        <>
+                                          <Avatar sx={{ width: "30px", height: "30px" }} src={user.pic} alt='user pic' />
+                                        </>
+                                        :
+                                        <Box component="div" sx={{ width: "30px", height: "30px" }}></Box>
+                                      }
+                                    </Box>
+                                  )
+                                }
+                                else {
+                                  return (<Box key={user._id}></Box>)
+                                }
+                              })}
                             </>
                           }
                         </>
+
                       }
 
-                      <Box sx={{ minHeight: "40px", gap: "5px", maxWidth: "30vw", color: `${message.sender._id === id ? "white" : "#000000"}`, backgroundColor: `${message.sender._id === id ? "purple" : "lightBlue"}`, marginBottom: "10px", display: 'flex', padding: "0px 5px 0px 5px", borderRadius: "5px" }}>
+                      {/*Name, Message and Time display */}
+                      <Box>
+                        {message.chat.isGroup &&
+                          <>
+                            {message.sender._id !== id &&
+                              <>
+                                {displayUserName(messages, message, i) &&
+                                  <Typography sx={{ fontSize: "10px" }}>{message.sender.username}</Typography>
+                                }
+                              </>
+                            }
+                          </>
+                        }
 
-                        {/* Message */}
+                        <Box sx={{ minHeight: "40px", gap: "5px", maxWidth: { xs: "60vw", md: "30vw" }, color: `${message.sender._id === id ? "white" : "#000000"}`, backgroundColor: `${message.sender._id === id ? "purple" : "#d9fdd3"}`, marginBottom: "10px", display: 'flex', padding: "0px 5px 0px 5px", borderRadius: "10px" }}>
+
+                          {/* Message */}
 
 
-                        <Typography sx={{ alignSelf: 'center' }}>
-                          {message.message}
-                        </Typography>
+                          <Typography sx={{ alignSelf: 'center',fontSize:"19px" }}>
+                            {message.message}
+                          </Typography>
 
-                        {/* Time */}
+                          {/* Time */}
 
-                        <Typography sx={{ fontSize: "10px", alignSelf: "end" }}>{new Date(message.updatedAt).toString().split(" ")[4].slice(0, -3)}</Typography>
+                          <Typography sx={{ fontSize: "10px", alignSelf: "end" }}>{new Date(message.updatedAt).toString().split(" ")[4].slice(0, -3)}</Typography>
+                        </Box>
                       </Box>
                     </Box>
-                  </Box>
+                    :
+
+                    //  users remove or left message
+
+                    <Box component="span" sx={{marginLeft:"auto",marginRight:"auto",marginTop:"10px", padding: "8px",display:'flex',justifyContent:'center',fontSize:"19px",backgroundColor:"#EFEEEA",borderRadius:"20px" }}>{message.message}
+
+                    </Box>}
                 </Box>
+
               ))}
             </>}
+            <Box
+              ref={messageRef}></Box>
 
           </Box>
+
 
           {/* send Messages */}
 
           <Box component="form" onSubmit={handleSend}>
             <OutlinedInput
-              sx={{ position: 'absolute', width: { xs: "96%", md: "98%" }, bottom: 0, margin: { xs: "10px" } }}
+              sx={{ position: 'fixed', backgroundColor: 'white', width: { xs: "96%", md: "63%" }, bottom: 0, margin: { xs: "10px" } }}
               placeholder='Chat ...'
               value={sendMessage}
               endAdornment={
@@ -208,7 +307,7 @@ const ChatBoard = () => {
                   </IconButton>
                 </InputAdornment>
               }
-              onChange={(e) => setSendMessage(e.target.value)}
+              onChange={handleMessage}
             />
 
           </Box>
