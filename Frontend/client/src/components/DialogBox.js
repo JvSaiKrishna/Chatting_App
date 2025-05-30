@@ -18,7 +18,7 @@ const DialogBox = () => {
     const [open, setOpen] = useState(false);
     const { loading, newUsers } = useSelector(state => state.chat)
 
-const jwt = Cookies.get("jwToken")
+    const jwt = Cookies.get("jwToken")
     const dispatch = useDispatch()
 
     const handleClickOpen = () => {
@@ -55,10 +55,10 @@ const jwt = Cookies.get("jwToken")
 
     const handleSrchFriends = (e) => {
         let search = e.target.value
-        if(search === ''){
+        if (search === '') {
             search = null
         }
-        dispatch(fetchUser({jwt,search}))
+        dispatch(fetchUser({ jwt, search }))
     }
 
     const handleRemove = (user) => {
@@ -78,11 +78,11 @@ const jwt = Cookies.get("jwToken")
     }
 
     const handleAdd = () => {
-        if(!groupName||!groupMembers){
+        if (!groupName || !groupMembers) {
             return
         }
         const groupData = { groupPic: pic, groupName, groupMembers }
-        dispatch(createGroup({jwt,groupData}))
+        dispatch(createGroup({ jwt, groupData }))
         setGroupName("")
         setGroupMembers('')
         handleClose()
@@ -93,13 +93,18 @@ const jwt = Cookies.get("jwToken")
 
     return (
         <>
+            {/* Icon code */}
+
             <Tooltip title="Create group">
                 <IconButton variant="outlined" onClick={handleClickOpen}>
                     <AddIcon sx={{ width: "30px", height: "30px" }} />
 
                 </IconButton>
             </Tooltip>
+
             <Dialog
+                fullWidth={true}
+                maxWidth={'xs'}
                 open={open}
                 onClose={handleClose}
 
@@ -139,15 +144,15 @@ const jwt = Cookies.get("jwToken")
                     <Box sx={{ display: 'flex' }}>
                         {selectedUsers?.map(user => {
                             return (
-                                
-                                    <Box component="div" key={user._id} sx={{ backgroundColor: "purple", display: 'flex', alignItems: 'center', margin: "0 5px 5px 0 ", paddingLeft: "5px", color: "white" }}>
 
-                                        <Typography>{user.username}</Typography>
-                                        <IconButton onClick={() => handleRemove(user)}>
-                                            <ClearIcon sx={{ color: 'white' }} />
-                                        </IconButton>
-                                    </Box>
-                                
+                                <Box component="div" key={user._id} sx={{ backgroundColor: "purple", display: 'flex', alignItems: 'center', margin: "0 5px 5px 0 ", paddingLeft: "5px", color: "white" }}>
+
+                                    <Typography>{user.username}</Typography>
+                                    <IconButton onClick={() => handleRemove(user)}>
+                                        <ClearIcon sx={{ color: 'white' }} />
+                                    </IconButton>
+                                </Box>
+
                             )
                         })}
                     </Box>
@@ -183,7 +188,7 @@ const jwt = Cookies.get("jwToken")
                         </>}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={()=>handleAdd()} variant='contained' type="submit">ADD</Button>
+                    <Button disabled={loading} onClick={() => handleAdd()} variant='contained' type="submit">ADD</Button>
                 </DialogActions>
             </Dialog>
 
