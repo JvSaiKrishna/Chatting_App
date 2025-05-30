@@ -130,7 +130,7 @@ const renameGroup = async (req, res) => {
 
 const addNewMember = async (req, res) => {
     try {
-        const { id, newUser } = req.body
+        let { id, newUsers } = req.body
         const isAdmin = await chat.findOne({
             $and: [
                 { _id: id },
@@ -143,7 +143,7 @@ const addNewMember = async (req, res) => {
         const isUserpresent = await chat.findOne({
             $and: [
                 { _id: id },
-                { users: { $elemMatch: { $eq: newUser } } }
+                { users: { $in: newUsers } }
             ]
 
         })
@@ -151,7 +151,7 @@ const addNewMember = async (req, res) => {
             throw new Error("User Already exist in Group")
         }
         else {
-            isAdmin.users.push(newUser)
+            isAdmin.users.push(...newUsers)
             let afterAddMember = await isAdmin.save()
             afterAddMember = await chat.findOne({ _id: afterAddMember._id }).populate("users", "-password").populate("groupAdmin", "-password")
             res.status(201).json({ group: afterAddMember })
@@ -181,16 +181,19 @@ const removeMember = async (req, res) => {
                 { _id: id },
                 { users: { $elemMatch: { $eq: newUser } } }
             ]
-
+            
         })
         if (!isUserpresent) {
             throw new Error("User not in Group")
         }
         else {
-            isUserpresent.users.pop(newUser)
-            let afterAddMember = await isUserpresent.save()
-            afterAddMember = await chat.findOne({ _id: afterAddMember._id }).populate("users", "-password").populate("groupAdmin", "-password")
-            res.status(201).json({ group: afterAddMember })
+            const afterRemoveMember = await chat.findByIdAndUpdate(
+                id,
+                {$pull:{users:newUser}},
+                {new:true}
+            ).populate("users", "-password").populate("groupAdmin", "-password")
+            
+            res.status(201).json({ group: afterRemoveMember })
             return
 
         }
@@ -203,4 +206,19 @@ const removeMember = async (req, res) => {
     }
 }
 
-export { createChat, fetchChats, groupChat, renameGroup, addNewMember, removeMember }
+const groupPicUpdate = async (req, res) => {
+    try {
+        const { id } = req.params
+        const { pic } = req.body
+        const cloudinaryUpload = await cloudinary.uploader.upload(pic, { folder: "/Chat App" })
+        await chat.findOneAndUpdate({ _id: id }, { pic: cloudinaryUpload.url })
+        const profile = await chat.findOne({ _id: id }).populate("users", "-password").populate("groupAdmin", "-password")
+        res.status(200).json({ profile })
+
+    } catch (error) {
+        console.log(error)
+        return res.status(500).json({ message: "Internal Server problem" })
+
+    }
+}
+export { createChat, fetchChats, groupChat, renameGroup, addNewMember, removeMember,groupPicUpdate }
