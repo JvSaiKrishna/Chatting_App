@@ -7,11 +7,15 @@ import user from "../models/userModel.js"
 
 const sendMessage = async (req, res) => {
     try {
-        const { context, chatId } = req.body
+        let { context, chatId,left } = req.body
+        if(!left){
+            left = false 
+        }
         let newMessage = new message({
             sender: req.id,
             message: context,
-            chat: chatId
+            chat: chatId,
+            left,
         })
         newMessage = await newMessage.save()
         newMessage = await newMessage.populate("sender", "-password")
