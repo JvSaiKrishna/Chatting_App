@@ -67,7 +67,7 @@ const Login = async (req, res) => {
             }
             if (ispwd) {
                 const token = jwt.sign(payload, process.env.SECRET_KEY)
-                res.status(200).json({ token,id:payload.id })
+                res.status(200).json({ token, id: payload.id })
                 return
             }
             throw new Error("Credentials not match")
@@ -81,24 +81,51 @@ const Login = async (req, res) => {
         return res.status(error.message ? 400 : 500).json({ message: error?.message || "Internal Server problem" })
     }
 }
+const profile = async (req, res) => {
+    try {
+        const { id } = req.params
+        const profile = await user.findOne({ _id: id }).select("-password")
+        res.status(200).json({ profile })
+
+    } catch (error) {
+        return res.status(500).json({ message: "Internal Server problem" })
+
+    }
+}
+const profileUpdate = async (req, res) => {
+    try {
+        const { id } = req.params
+        const { pic } = req.body
+        const cloudinaryUpload = await cloudinary.uploader.upload(pic, { folder: "/Chat App" })
+        await user.findOneAndUpdate({ _id: id }, { pic: cloudinaryUpload.url }).select("-password")
+        const profile = await user.findOne({ _id: id }).select("-password")
+
+        res.status(200).json({ profile })
+
+    } catch (error) {
+        console.log(error)
+        return res.status(500).json({ message: "Internal Server problem" })
+
+    }
+}
 
 const fetchAllUser = async (req, res) => {
     try {
         const { search } = req.query
-    const getUsers = await user.find({
-        $or: [{
-            username: { $regex: search, $options: "i" }
-        },
-        {
-            email: { $regex: search, $options: "i" }
-        }
-    ]
-    }).find({ _id: { $ne: req.id } }).select("-password")
-    res.status(200).json({users:getUsers})
+        const getUsers = await user.find({
+            $or: [{
+                username: { $regex: search, $options: "i" }
+            },
+            {
+                email: { $regex: search, $options: "i" }
+            }
+            ]
+        }).find({ _id: { $ne: req.id } }).select("-password")
+        res.status(200).json({ users: getUsers })
     } catch (error) {
-        return res.status(500).json({message:  "Internal Server problem" })
-        
+        return res.status(500).json({ message: "Internal Server problem" })
+
     }
 }
 
-export { Registration, Login, fetchAllUser }
+export { Registration, Login, fetchAllUser, profile ,profileUpdate}
