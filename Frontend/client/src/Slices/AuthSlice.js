@@ -58,12 +58,58 @@ export const LogIn = createAsyncThunk("auth/login", async (userData) => {
 
     }
 })
+export const Profile = createAsyncThunk("auth/:id",async({jwt,id})=>{
+    
+    try {
+        const option = {
+            method: "GET",
+            headers: {
+                "Content-type": "application/json",
+                "authorization": `Bearer ${jwt}`
+
+            },
+        }
+        const res = await fetch(`${api}/api/user/${id}`, option)
+        const data = await res.json()
+        if (res.ok) {
+            return data
+        }
+        throw new Error(data.message)
+    } catch (error) {
+        throw error
+
+    }
+}) 
+export const UpdateProfile = createAsyncThunk("auth/updateProfile/:id",async({jwt,id,userPic})=>{
+    
+    try {
+        const option = {
+            method: "PUT",
+            headers: {
+                "Content-type": "application/json",
+                "authorization": `Bearer ${jwt}`
+
+            },
+            body:JSON.stringify(userPic)
+        }
+        const res = await fetch(`${api}/api/user/${id}`, option)
+        const data = await res.json()
+        if (res.ok) {
+            return data
+        }
+        throw new Error(data.message)
+    } catch (error) {
+        throw error
+
+    }
+}) 
 
 const AuthSlice = createSlice({
     name: "auth",
     initialState: {
         loading: false,
         isAuthorized: false,
+        profile:null
     },
     reducers: {
         logout: (state) => {
@@ -104,6 +150,30 @@ const AuthSlice = createSlice({
             })
             .addCase(LogIn.rejected, (state, action) => {
                 state.loading = false
+            })
+            .addCase(Profile.pending, (state) => {
+                state.loading = true
+            })
+            .addCase(Profile.fulfilled, (state, action) => {
+                state.loading = false
+                state.profile = action.payload.profile
+
+            })
+            .addCase(Profile.rejected, (state) => {
+                state.loading = false
+                state.profile = null
+            })
+            .addCase(UpdateProfile.pending, (state) => {
+                state.loading = true
+            })
+            .addCase(UpdateProfile.fulfilled, (state, action) => {
+                state.loading = false
+                state.profile = action.payload.profile
+
+            })
+            .addCase(UpdateProfile.rejected, (state) => {
+                state.loading = false
+                state.profile = null
             })
     }
 });
