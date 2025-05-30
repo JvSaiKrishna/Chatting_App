@@ -42,11 +42,27 @@ io.on("connection", (socket) => {
         socket.join(id)
     })
     socket.on("join room", (id) => {
-        console.log("room joinned:", id)
+        console.log("A user joined the room:", id)
         socket.join(id)
     })
-    socket.on("send message", ({message,id}) => {
-        socket.to(id).emit("recived message", message)
+    socket.on("send message", (message) => {
+        message.chat.users.forEach(user => {
+            if (user._id === message.sender._id) {
+                return
+            }
+            socket.to(user._id).emit("recived message", message)
+
+        });
+    })
+    socket.on("typing",({typing,chatId,userId})=>{
+        socket.to(chatId).emit("typing on",({typing,chatId,userId}))
+    })
+    socket.on("stop typing", ({typing,chatId})=>{
+        socket.to(chatId).emit("typing off",({typing,chatId}))
+
+    })
+    socket.on("disconnect",()=>{
+        console.log("socket is disconnected")
     })
 
 
