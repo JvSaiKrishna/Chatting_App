@@ -204,7 +204,7 @@ const ChatBoard = () => {
                   {/* Dates display logic */}
 
                   {dateLogic(messages, message.updatedAt.split("T")[0], i) &&
-                    <Typography sx={{ marginLeft:"auto",marginRight:"auto",padding:"6px",backgroundColor:"#EFEEEA",borderRadius:"20px" }}>
+                    <Typography sx={{ marginLeft:"auto",marginRight:"auto",mt:'10px',padding:"6px",backgroundColor:"#EFEEEA",borderRadius:"20px" }}>
                       {message.updatedAt.split("T")[0]}
                     </Typography>
                   }
@@ -280,7 +280,7 @@ const ChatBoard = () => {
 
                     //  users remove or left message
 
-                    <Box component="span" sx={{marginLeft:"auto",marginRight:"auto",marginTop:"10px", padding: "8px",display:'flex',justifyContent:'center',fontSize:"19px",backgroundColor:"#EFEEEA",borderRadius:"20px" }}>{message.message}
+                    <Box component="span" sx={{marginLeft:"auto",marginRight:"auto",marginTop:"10px",marginRight:"auto", padding: "8px",display:'flex',justifyContent:'center',fontSize:"19px",backgroundColor:"#EFEEEA",borderRadius:"20px" }}>{message.message}
 
                     </Box>}
                 </Box>
