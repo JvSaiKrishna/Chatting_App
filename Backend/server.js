@@ -28,7 +28,7 @@ const server = createServer(app)
 const io = new Server(server, {
     pingTimeout: 60000,
     cors: {
-        origin: "http://localhost:3000",
+        origin: "*",
         credentials: true
     }
 
